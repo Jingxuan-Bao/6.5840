@@ -4,3 +4,9 @@ api.key
 *-handin.tar.gz
 .DS_Store
 .check-build
+pkg/
+api.key
+.api.key.trimmed
+*-handin.tar.gz
+raftcopy/
+.DS_Store
