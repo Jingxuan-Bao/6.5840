@@ -1,13 +1,18 @@
 package kvraft
 
-import "6.5840/labrpc"
-import "crypto/rand"
-import "math/big"
+import (
+	"crypto/rand"
+	"math/big"
 
+	"6.5840/labrpc"
+)
 
 type Clerk struct {
 	servers []*labrpc.ClientEnd
 	// You will have to modify this struct.
+	leaderId      int
+	clientId      int64
+	lastRequestId int
 }
 
 func nrand() int64 {
@@ -21,6 +26,9 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 	ck := new(Clerk)
 	ck.servers = servers
 	// You'll have to add code here.
+	ck.leaderId = 0
+	ck.clientId = nrand()
+	ck.lastRequestId = 0
 	return ck
 }
 
@@ -35,9 +43,26 @@ func MakeClerk(servers []*labrpc.ClientEnd) *Clerk {
 // must match the declared types of the RPC handler function's
 // arguments. and reply must be passed as a pointer.
 func (ck *Clerk) Get(key string) string {
+	requestId := ck.lastRequestId + 1
 
-	// You will have to modify this function.
-	return ""
+	for {
+		args := GetArgs{
+			Key:       key,
+			ClientId:  ck.clientId,
+			RequestId: requestId,
+		}
+		var reply GetReply
+
+		ok := ck.servers[ck.leaderId].Call("KVServer.Get", &args, &reply)
+		if ok == false || reply.WrongLeader == true {
+			ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
+			continue
+		}
+		// request is sent successfully
+		ck.lastRequestId = requestId
+		return reply.Value
+	}
+
 }
 
 // shared by Put and Append.
@@ -50,6 +75,27 @@ func (ck *Clerk) Get(key string) string {
 // arguments. and reply must be passed as a pointer.
 func (ck *Clerk) PutAppend(key string, value string, op string) {
 	// You will have to modify this function.
+	requestId := ck.lastRequestId + 1
+	for {
+		args := PutAppendArgs{
+			Key:       key,
+			Value:     value,
+			Op:        op,
+			ClientId:  ck.clientId,
+			RequestId: requestId,
+		}
+		var reply PutAppendReply
+
+		ok := ck.servers[ck.leaderId].Call("KVServer.PutAppend", &args, &reply)
+		if ok == false || reply.WrongLeader == true {
+			ck.leaderId = (ck.leaderId + 1) % len(ck.servers)
+			continue
+		}
+		// request is sent successfully
+		ck.lastRequestId = requestId
+		return
+	}
+
 }
 
 func (ck *Clerk) Put(key string, value string) {
